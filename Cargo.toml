@@ -1,0 +1,18 @@
+[package]
+name = "youtube-proxy-server"
+version = "0.1.0"
+authors = ["Ray Britton <raybritton@gmail.com>"]
+edition = "2018"
+publish = false
+repository = "https://github.com/raybritton/youtube-proxy-server"
+description = "Server to proxy requests to YouTube Data API"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.31"
+dotenv = "0.15.0"
+rocket = "0.4.5"
+rocket_contrib = "0.4.5"
+reqwest = { version = "0.10.6", features = ["blocking", "json"] }
+serde = { version = "1.0.111", features = ["derive"] }
