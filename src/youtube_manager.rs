@@ -19,12 +19,11 @@ const COST_SEARCH: usize = 100;
 
 pub struct YoutubeManager {
     key_manager: Mutex<KeyManager>,
-    api_key: String,
     client: Client,
 }
 
 impl YoutubeManager {
-    pub fn new(key_manager: KeyManager, api_key: String) -> YoutubeManager {
+    pub fn new(key_manager: KeyManager) -> YoutubeManager {
         let client = Client::builder()
             .proxy(Proxy::all("http://127.0.0.1:8888").unwrap())
             .connect_timeout(Duration::from_secs(TIMEOUT))
@@ -34,8 +33,7 @@ impl YoutubeManager {
 
         return YoutubeManager {
             key_manager: Mutex::new(key_manager),
-            api_key,
-            client,
+            client
         };
     }
 }
