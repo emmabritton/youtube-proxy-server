@@ -8,6 +8,8 @@ repository = "https://github.com/raybritton/youtube-proxy-server"
 description = "Server to proxy requests to YouTube Data API"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+lto = "fat"
 
 [dependencies]
 anyhow = "1.0.31"
