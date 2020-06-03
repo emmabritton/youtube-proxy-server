@@ -25,7 +25,6 @@ pub struct YoutubeManager {
 impl YoutubeManager {
     pub fn new(key_manager: KeyManager) -> YoutubeManager {
         let client = Client::builder()
-            .proxy(Proxy::all("http://127.0.0.1:8888").unwrap())
             .connect_timeout(Duration::from_secs(TIMEOUT))
             .timeout(Duration::from_secs(TIMEOUT))
             .build()
