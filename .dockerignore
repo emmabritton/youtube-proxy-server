@@ -1,0 +1,5 @@
+target/
+.do/
+Dockerfile
+.env
+README.md

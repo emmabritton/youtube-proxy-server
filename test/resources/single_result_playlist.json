@@ -1,0 +1,53 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "VKLFTJtfYyEGMKxgJVv3HL6wJNA",
+  "pageInfo": {
+    "totalResults": 1,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#playlist",
+      "etag": "2d_4HmpPBoJLpcLGMtjNFziaSS0",
+      "id": "PLoGgviqq4845Sy3UfnNh_PljzAptMR7MQ",
+      "snippet": {
+        "publishedAt": "2020-03-20T01:40:04Z",
+        "channelId": "UCViAcUsxrffb-dH50U5VHqw",
+        "title": "AP Chemistry",
+        "description": "AP Chemistry online classes and review sessions taught by Mr. Byrne, Glenbard West High School (Glen Ellyn, IL), and Mr. Farabaugh, Albemarle High School (Charlottesville, VA).  Topics include \"Acids and Bases.\"\n\nAP exams in 2020 will be at-home, online tests. Check http://apstudents.org/exams2020 for more information.\n\nFind Us: https://apstudents.collegeboard.org\nFollow us on Twitter: https://twitter.com/APforStudents",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/0qK-83hIC4s/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/0qK-83hIC4s/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/0qK-83hIC4s/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/0qK-83hIC4s/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/0qK-83hIC4s/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Advanced Placement",
+        "localized": {
+          "title": "AP Chemistry",
+          "description": "AP Chemistry online classes and review sessions taught by Mr. Byrne, Glenbard West High School (Glen Ellyn, IL), and Mr. Farabaugh, Albemarle High School (Charlottesville, VA).  Topics include \"Acids and Bases.\"\n\nAP exams in 2020 will be at-home, online tests. Check http://apstudents.org/exams2020 for more information.\n\nFind Us: https://apstudents.collegeboard.org\nFollow us on Twitter: https://twitter.com/APforStudents"
+        }
+      }
+    }
+  ]
+}

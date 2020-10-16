@@ -1,55 +1,66 @@
 use crate::key_manager::KeyManager;
 use std::time::Duration;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use reqwest::blocking::{Client};
-use std::sync::Mutex;
-use reqwest::Url;
-use reqwest::Proxy;
 use std::collections::HashMap;
 use crate::models::content_type::ContentType;
-use crate::models::youtube::{SearchResult, SearchResponse};
 use crate::models::channel::Channel;
 use crate::models::playlist::Playlist;
 use crate::models::video::Video;
+use crate::youtube_client::YoutubeClient;
 
-const YOUTUBE_URL: &'static str = "https://www.googleapis.com/youtube/v3";
 const TIMEOUT: u64 = 120;
 
-const COST_SEARCH: usize = 100;
-
 pub struct YoutubeManager {
-    key_manager: Mutex<KeyManager>,
-    client: Client,
+    client: YoutubeClient
 }
 
 impl YoutubeManager {
-    pub fn new(key_manager: KeyManager) -> YoutubeManager {
-        let client = Client::builder()
+    pub fn new(key_manager: KeyManager, base_url: String, proxy: &Option<String>) -> YoutubeManager {
+        let mut builder = Client::builder()
             .connect_timeout(Duration::from_secs(TIMEOUT))
-            .timeout(Duration::from_secs(TIMEOUT))
-            .build()
-            .unwrap();
+            .timeout(Duration::from_secs(TIMEOUT));
+
+        if let Some(proxy) = proxy {
+            builder = builder.proxy(reqwest::Proxy::all(proxy).unwrap())
+        }
+
+        let client = builder.build().unwrap();
+
+        let youtube_client = YoutubeClient::new(key_manager, base_url, client);
 
         return YoutubeManager {
-            key_manager: Mutex::new(key_manager),
-            client
+            client: youtube_client
         };
     }
 }
 
 impl YoutubeManager {
     pub fn get_key_status(&self) -> HashMap<usize, usize> {
-        self.key_manager.lock().unwrap().get_status()
+        self.client.get_key_status()
     }
 
-    pub fn single_video(&self, video_id: String) {}
+    pub fn single_video(&self, video_id: String) -> Result<Option<Video>> {
+        let result = self.client.single(ContentType::VIDEO, video_id)?;
+        let video = result.map(|item| item.into_video().unwrap());
+        Ok(video)
+    }
 
-    pub fn single_channel(&self, channel_id: String) {}
+    pub fn single_channel(&self, channel_id: String) -> Result<Option<Channel>> {
+        let result = self.client.single(ContentType::CHANNEL, channel_id)?;
+        let channel = result.map(|item| item.into_channel().unwrap());
+        Ok(channel)
+    }
 
-    pub fn single_playlist(&self, playlist_id: String) {}
+    pub fn single_playlist(&self, playlist_id: String) -> Result<Option<Playlist>> {
+        let result = self.client.single(ContentType::PLAYLIST, playlist_id)?;
+        let playlist = result.map(|item| item.into_playlist().unwrap());
+        Ok(playlist)
+    }
 
     pub fn search_channel(&self, search_query: String) -> Result<Vec<Channel>> {
-        let channels = self.search(ContentType::CHANNEL, search_query)?
+        let search_params = vec![("q", search_query)];
+        let channels = self.client.search(ContentType::CHANNEL, search_params)?
             .into_iter()
             .map(|item| item.into_channel().unwrap())
             .collect();
@@ -57,7 +68,8 @@ impl YoutubeManager {
     }
 
     pub fn search_video(&self, search_query: String) -> Result<Vec<Video>> {
-        let channels = self.search(ContentType::VIDEO, search_query)?
+        let search_params = vec![("q", search_query)];
+        let channels = self.client.search(ContentType::VIDEO, search_params)?
             .into_iter()
             .map(|item| item.into_video().unwrap())
             .collect();
@@ -65,57 +77,36 @@ impl YoutubeManager {
     }
 
     pub fn search_playlist(&self, search_query: String) -> Result<Vec<Playlist>> {
-        let channels = self.search(ContentType::PLAYLIST, search_query)?
+        let search_params = vec![("q", search_query)];
+        let channels = self.client.search(ContentType::PLAYLIST, search_params)?
             .into_iter()
             .map(|item| item.into_playlist().unwrap())
             .collect();
         Ok(channels)
     }
 
-    fn search(&self, content_type: ContentType, search_query: String) -> Result<Vec<SearchResult>> {
-        let key = self.key_manager.lock().unwrap().get_key(COST_SEARCH);
+    pub fn list_latest_videos_for_channel(&self, id: String) -> Result<Vec<Video>> {
+        let search_params = vec![("channelId", id)];
+        let videos = self.client.search(ContentType::VIDEO, search_params)?
+            .into_iter()
+            .map(|item| item.into_video().unwrap())
+            .collect();
+        Ok(videos)
+    }
 
-        if let None = key {
-            return Err(Error::msg("No keys available for search"));
+    pub fn list_videos_for_playlist(&self, id: String, page_token: Option<String>) -> Result<(Vec<Video>, Option<String>)> {
+        let mut search_params = vec![
+            ("playlistId", id),
+        ];
+        if let Some(token) = page_token {
+            search_params.push(("pageToken", token));
         }
 
-        let key = key.unwrap();
+        let (videos, page_token) = self.client.playlist_page(search_params)?;
 
-        let mut params = vec![
-            ("part", "snippet"),
-            ("key", &key),
-            ("maxResults", "50"),
-            ("safeSearch", "none"),
-            ("order", "date"),
-            ("q", &search_query)];
-
-        match content_type {
-            ContentType::CHANNEL => params.push(("type", "channel")),
-            ContentType::VIDEO => {
-                params.push(("type", "video"));
-                params.push(("videoDimension", "2d"))
-            },
-            ContentType::PLAYLIST => params.push(("type", "playlist")),
-        }
-
-        let resp = self.client
-            .get(Url::parse_with_params(&format!("{}/search", YOUTUBE_URL), &params)?)
-            .send();
-
-        match resp {
-            Ok(resp) => {
-                if resp.status().is_success()  {
-                    let items = resp.json::<SearchResponse>()?
-                        .items;
-                    Ok(items)
-                } else if resp.status().as_u16() == 429  {
-                    self.key_manager.lock().unwrap().set_key_as_expired(key);
-                    self.search(content_type, search_query)
-                } else {
-                    Err(Error::msg(format!("Error searching: {}", resp.status().as_u16())))
-                }
-            }
-            Err(err) => Err(Error::from(err))
-        }
+        let videos = videos.into_iter()
+            .map(|item| item.into_video().unwrap())
+            .collect();
+        Ok((videos, page_token))
     }
 }
