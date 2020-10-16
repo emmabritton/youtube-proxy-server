@@ -1,5 +1,5 @@
 # Create container to build project
-FROM rustlang/rust:nightly-slim as builder
+FROM rustlang/rust:nightly as builder
 
 # Create new project
 RUN USER=root cargo new --bin youtube-proxy-server
