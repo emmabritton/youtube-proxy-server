@@ -14,6 +14,7 @@ use rocket_contrib::json::Json;
 use std::collections::HashMap;
 use rocket::request::{FromRequest, Outcome};
 use rocket::http::Status;
+use chrono::{Utc, SecondsFormat};
 
 mod endpoints;
 mod models;
@@ -25,10 +26,9 @@ mod youtube_client;
 fn main() -> Result<()> {
     dotenv().ok();
 
-    let hostname = env::var("HOSTNAME").unwrap_or(String::from("localhost"));
     let port: u16 = env::var("PORT").unwrap_or(String::from("3001")).parse().context("Invalid PORT").unwrap();
     let proxy = env::var("PROXY").ok();
-    let youtube_keys = env::var("YOUTUBE_API_KEYS").context("Invalid YOUTUBE_API_KEYS").unwrap().split(",").map(|item| item.to_string()).collect();
+    let youtube_keys = env::var("YOUTUBE_API_KEYS").context("Invalid/Missing YOUTUBE_API_KEYS").unwrap().split(",").map(|item| item.to_string()).collect();
     let api_key = if env::var_os("API_KEY").is_some() {
         let key = env::var("API_KEY").context("Invalid API_KEY").unwrap();
         Some(key)
@@ -39,14 +39,15 @@ fn main() -> Result<()> {
     let key_manager = KeyManager::new(youtube_keys);
     let youtube_manager = YoutubeManager::new(key_manager, YOUTUBE_URL.to_string(), &proxy);
 
-    println!("Starting youtube proxy server on {}:{}", hostname, port);
+    let date = Utc::now(). to_rfc3339_opts(SecondsFormat::Millis, true);
+    println!("Starting youtube proxy server on {} at {}", port, date);
 
     if let Some(proxy) = proxy {
         println!("Proxying requests via {}", proxy);
     }
 
     let config = Config::build(Environment::active()?)
-        .address(hostname)
+        .address("0.0.0.0")
         .port(port)
         .finalize()?;
 
