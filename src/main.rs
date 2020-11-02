@@ -63,6 +63,7 @@ fn make_rocket(config: Config, api_key: Option<String>, youtube_manager: Youtube
         .mount("/", routes![alive, status,
             endpoints::search::channel, endpoints::search::video, endpoints::search::playlist,
             endpoints::single::channel, endpoints::single::video, endpoints::single::playlist,
+            endpoints::videos::get_videos_for_channel,
             endpoints::videos::get_most_recent_videos_for_channel, endpoints::videos::get_videos_for_playlist]);
 }
 
