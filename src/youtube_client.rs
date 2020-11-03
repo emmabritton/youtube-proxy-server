@@ -1,5 +1,5 @@
 use std::sync::{Mutex, Arc};
-use reqwest::blocking::{Client};
+use reqwest::blocking::{Client, Response};
 use anyhow::{Error, Result};
 use crate::key_manager::KeyManager;
 use reqwest::Url;
@@ -47,118 +47,58 @@ impl YoutubeClient {
     }
 
     pub fn playlist_page(&self, search_params: Vec<(&'static str, String)>) -> Result<(Vec<PlaylistItem>, Option<String>)> {
-        let key = self.key_manager.lock().unwrap().get_key(COST_PLAYLIST_PAGE);
-
-        if let None = key {
-            return Err(Error::msg("No keys available for playlist items"));
-        }
-
-        let key = key.unwrap();
-
         let mut params = vec![
             ("part", String::from("id,snippet")),
-            ("key", key.clone()),
             ("maxResults", String::from("50"))];
 
         for (key, value) in &search_params {
             params.push((key, value.clone()));
         }
 
-        let resp = self.client
-            .get(Url::parse_with_params(&format!("{}/playlistItems", self.base_url), &params)?)
-            .send();
-
-        match resp {
-            Ok(resp) => {
-                if resp.status().is_success() {
-                    let response = resp.json::<PlaylistResponse>()?;
-                    Ok((response.items, response.next_page_token))
-                } else if resp.status().as_u16() == 429 {
-                    self.key_manager.lock().unwrap().set_key_as_expired(key);
-                    self.playlist_page(search_params)
-                } else {
-                    let status_code = resp.status().as_u16();
-                    eprintln!("Playlist items Error: {}\n{}", status_code, resp.text().unwrap_or(String::from("Unable to parse response")));
-                    Err(Error::msg(format!("Error get playlist items: {}", status_code)))
-                }
-            }
-            Err(err) => Err(Error::from(err))
-        }
+        self.request(COST_PLAYLIST_PAGE, "playlist items", params, "playlistItems", |resp| {
+            let response = resp.json::<PlaylistResponse>()?;
+            Ok(Some((response.items, response.next_page_token)))
+        }).map(|result| result.unwrap())
     }
 
     pub fn single(&self, content_type: ContentType, id: String) -> Result<Option<ListItem>> {
-        let key = self.key_manager.lock().unwrap().get_key(COST_SINGLE);
-
-        if let None = key {
-            return Err(Error::msg("No keys available for single"));
-        }
-
-        let key = key.unwrap();
-
-        let mut params: Vec<(&str, &str)> = vec![
-            ("key", &key),
-            ("id", &id)];
+        let mut params: Vec<(&str, String)> = vec![("id", id)];
 
         let path;
 
         match content_type {
             ContentType::CHANNEL => {
                 path = "channels";
-                params.push(("part", "snippet,id,statistics,contentDetails"));
+                params.push(("part", String::from("snippet,id,statistics,contentDetails")));
             }
             ContentType::VIDEO => {
                 path = "videos";
-                params.push(("part", "snippet,id"));
+                params.push(("part", String::from("snippet,id")));
             }
             ContentType::PLAYLIST => {
                 path = "playlists";
-                params.push(("part", "snippet,id"));
+                params.push(("part", String::from("snippet,id")));
             }
         }
 
-        let resp = self.client
-            .get(Url::parse_with_params(&format!("{}/{}", self.base_url, path), &params)?)
-            .send();
-
-        match resp {
-            Ok(resp) => {
-                if resp.status().is_success() {
-                    let response = resp.json::<ListResponse>()?;
-                    if response.items.is_some() {
-                        let mut list = response.items.unwrap();
-                        if list.len() > 0 {
-                            Ok(Some(list.remove(0)))
-                        } else {
-                            Ok(None)
-                        }
-                    } else {
-                        Ok(None)
-                    }
-                } else if resp.status().as_u16() == 429 {
-                    self.key_manager.lock().unwrap().set_key_as_expired(key);
-                    self.single(content_type, id)
+        self.request(COST_SINGLE, "single", params, path, |resp| {
+            let response = resp.json::<ListResponse>()?;
+            if response.items.is_some() {
+                let mut list = response.items.unwrap();
+                if list.len() > 0 {
+                    Ok(Some(list.remove(0)))
                 } else {
-                    let status_code = resp.status().as_u16();
-                    eprintln!("Single Error: {}\n{}", status_code, resp.text().unwrap_or(String::from("Unable to parse response")));
-                    Err(Error::msg(format!("Error getting single: {}", status_code)))
+                    Ok(None)
                 }
+            } else {
+                Ok(None)
             }
-            Err(err) => Err(Error::from(err))
-        }
+        })
     }
 
     pub fn search(&self, content_type: ContentType, search_params: Vec<(&'static str, String)>) -> Result<Vec<SearchItem>> {
-        let key = self.key_manager.lock().unwrap().get_key(COST_SEARCH);
-
-        if let None = key {
-            return Err(Error::msg("No keys available for search"));
-        }
-
-        let key = key.unwrap();
-
         let mut params = vec![
             ("part", String::from("snippet")),
-            ("key", key.clone()),
             ("maxResults", String::from("50")),
             ("safeSearch", String::from("none")),
             ("order", String::from("date"))];
@@ -176,26 +116,40 @@ impl YoutubeClient {
             ContentType::PLAYLIST => params.push(("type", String::from("playlist"))),
         }
 
+        self.request(COST_SEARCH, "search", params, "search", |resp| {
+            Ok(Some(resp.json::<SearchResponse>()?.items))
+        }).map(|result| result.unwrap())
+    }
+
+    pub fn request<T, F: Fn(Response) -> Result<Option<T>>>(&self, cost: usize, key_error_name: &'static str, mut params: Vec<(&'static str, String)>, path: &str, response_handler: F) -> Result<Option<T>> {
+        let key = self.key_manager.lock().unwrap().get_key(cost);
+
+        if let None = key {
+            return Err(Error::msg(format!("No keys available for {}", key_error_name)));
+        }
+
+        let key = key.unwrap();
+
+        params.push(("key", key.clone()));
+
         let resp = self.client
-            .get(Url::parse_with_params(&format!("{}/search", self.base_url), &params)?)
+            .get(Url::parse_with_params(&format!("{}/{}", self.base_url, path), &params)?)
             .send();
 
         match resp {
             Ok(resp) => {
                 if resp.status().is_success() {
-                    Ok(resp.json::<SearchResponse>()?.items)
+                    response_handler(resp)
                 } else if resp.status().as_u16() == 429 {
-                    self.key_manager.lock().unwrap().set_key_as_expired(key);
-                    self.search(content_type, search_params)
+                    self.key_manager.lock().unwrap().set_key_as_expired(&key);
+                    self.request(cost, key_error_name, params, path, response_handler)
                 } else {
                     let status_code = resp.status().as_u16();
-                    eprintln!("Search Error: {}\n{}", status_code, resp.text().unwrap_or(String::from("Unable to parse response")));
-                    Err(Error::msg(format!("Error searching: {}", status_code)))
+                    eprintln!("{} Error: {}\n{}", key_error_name, status_code, resp.text().unwrap_or(String::from("Unable to parse response")));
+                    Err(Error::msg(format!("Error getting {}: {}", key_error_name, status_code)))
                 }
             }
-            Err(err) => {
-                Err(Error::from(err))
-            }
+            Err(err) => Err(Error::from(err))
         }
     }
 }

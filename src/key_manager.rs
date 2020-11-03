@@ -61,11 +61,11 @@ impl KeyManager {
         }
     }
 
-    pub fn set_key_as_expired(&mut self, key: String) {
-        if self.key_quotas[&key] == DEFAULT_QUOTA {
+    pub fn set_key_as_expired(&mut self, key: &str) {
+        if self.key_quotas[key] == DEFAULT_QUOTA {
             eprintln!("Key {} has probably permanently expired", key);
         }
-        self.key_quotas.insert(key, 0);
+        self.key_quotas.insert(key.to_string(), 0);
     }
 
     pub fn get_status(&self) -> HashMap<usize, usize> {
@@ -134,8 +134,8 @@ mod tests {
         let second_key = key_manager.get_key(100);
         let third_key = key_manager.get_key(100);
         let first_key_again = key_manager.get_key(100);
-        key_manager.set_key_as_expired(second_key.as_ref().unwrap().to_string());
-        key_manager.set_key_as_expired(third_key.as_ref().unwrap().to_string());
+        key_manager.set_key_as_expired(second_key.as_ref().unwrap());
+        key_manager.set_key_as_expired(third_key.as_ref().unwrap());
         //WHEN all remaining keys in this loop are expired and a key is requested
         let key_after_expiry = key_manager.get_key(100);
         //THEN key should be key1
