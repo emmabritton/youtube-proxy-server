@@ -46,7 +46,7 @@ mod test {
 
         let ms = calc_wait_time(now);
 
-        assert_eq!(ms, 3660000)
+        assert!(ms > 3659000 && ms < 3660999)
     }
 
     #[test]
@@ -57,6 +57,6 @@ mod test {
 
         let ms = calc_wait_time(now);
 
-        assert_eq!(ms, 82860000)
+        assert!(ms > 82859000 && ms < 82860999)
     }
 }
