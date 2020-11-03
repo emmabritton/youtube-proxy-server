@@ -22,6 +22,7 @@ mod key_manager;
 mod youtube_manager;
 mod date_util;
 mod youtube_client;
+mod timer;
 
 fn main() -> Result<()> {
     dotenv().ok();
@@ -39,7 +40,7 @@ fn main() -> Result<()> {
     let key_manager = KeyManager::new(youtube_keys);
     let youtube_manager = YoutubeManager::new(key_manager, YOUTUBE_URL.to_string(), &proxy);
 
-    let date = Utc::now(). to_rfc3339_opts(SecondsFormat::Millis, true);
+    let date = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
     println!("Starting youtube proxy server on {} at {}", port, date);
 
     if let Some(proxy) = proxy {
@@ -51,6 +52,8 @@ fn main() -> Result<()> {
         .port(port)
         .finalize()?;
 
+    youtube_manager.start_reset_timer();
+
     make_rocket(config, api_key, youtube_manager).launch();
 
     Ok(())
@@ -60,7 +63,7 @@ fn make_rocket(config: Config, api_key: Option<String>, youtube_manager: Youtube
     return rocket::custom(config)
         .manage(youtube_manager)
         .manage(api_key)
-        .mount("/", routes![alive, status,
+        .mount("/", routes![alive, status, reset_quotas,
             endpoints::search::channel, endpoints::search::video, endpoints::search::playlist,
             endpoints::single::channel, endpoints::single::video, endpoints::single::playlist,
             endpoints::videos::get_videos_for_channel,
@@ -75,6 +78,12 @@ fn alive() -> &'static str {
 #[get("/v1/admin/status")]
 fn status(youtube_manager: State<YoutubeManager>, _api_key: ApiKey) -> Json<HashMap<usize, usize>> {
     Json(youtube_manager.get_key_status())
+}
+
+#[post("/v1/admin/quotas/reset")]
+fn reset_quotas(youtube_manager: State<YoutubeManager>, _api_key: ApiKey) -> Status {
+    youtube_manager.reset_key_status();
+    Status::Ok
 }
 
 pub struct ApiKey {}

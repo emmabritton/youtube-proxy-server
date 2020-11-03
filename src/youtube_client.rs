@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 use reqwest::blocking::{Client};
 use anyhow::{Error, Result};
 use crate::key_manager::KeyManager;
@@ -9,6 +9,7 @@ use crate::models::youtube::{SearchResponse, ListResponse, PlaylistResponse};
 use crate::models::youtube::items::search_item::SearchItem;
 use crate::models::youtube::items::list_item::ListItem;
 use crate::models::youtube::items::playlist_item::PlaylistItem;
+use crate::timer::start_reset_timer;
 
 pub const YOUTUBE_URL: &'static str = "https://www.googleapis.com/youtube/v3";
 
@@ -17,7 +18,7 @@ const COST_SINGLE: usize = 6;
 const COST_PLAYLIST_PAGE: usize = 3;
 
 pub struct YoutubeClient {
-    key_manager: Mutex<KeyManager>,
+    key_manager: Arc<Mutex<KeyManager>>,
     client: Client,
     base_url: String,
 }
@@ -25,7 +26,7 @@ pub struct YoutubeClient {
 impl YoutubeClient {
     pub fn new(key_manager: KeyManager, base_url: String, client: Client) -> YoutubeClient {
         return YoutubeClient {
-            key_manager: Mutex::new(key_manager),
+            key_manager: Arc::new(Mutex::new(key_manager)),
             client,
             base_url,
         };
@@ -35,6 +36,14 @@ impl YoutubeClient {
 impl YoutubeClient {
     pub fn get_key_status(&self) -> HashMap<usize, usize> {
         self.key_manager.lock().unwrap().get_status()
+    }
+
+    pub fn reset_key_status(&self) {
+        self.key_manager.lock().unwrap().reset_keys();
+    }
+
+    pub fn start_timer(&self) {
+        start_reset_timer(self.key_manager.clone())
     }
 
     pub fn playlist_page(&self, search_params: Vec<(&'static str, String)>) -> Result<(Vec<PlaylistItem>, Option<String>)> {

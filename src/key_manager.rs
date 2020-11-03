@@ -29,6 +29,11 @@ impl KeyManager {
         }
     }
 
+    pub fn reset_keys(&mut self) {
+        self.key_quotas.iter_mut()
+            .for_each(|(_, v)| *v = DEFAULT_QUOTA);
+    }
+
     pub fn get_key(&mut self, cost: usize) -> Option<String> {
         let keys: Vec<String> = self.key_quotas.iter()
             .map(|(key, _)| key)

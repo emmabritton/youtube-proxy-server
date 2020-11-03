@@ -40,6 +40,14 @@ impl YoutubeManager {
         self.client.get_key_status()
     }
 
+    pub fn reset_key_status(&self) {
+        self.client.reset_key_status();
+    }
+
+    pub fn start_reset_timer(&self) {
+        self.client.start_timer();
+    }
+
     pub fn single_video(&self, video_id: String) -> Result<Option<Video>> {
         let result = self.client.single(ContentType::VIDEO, video_id)?;
         let video = result.map(|item| item.into_video().unwrap());
